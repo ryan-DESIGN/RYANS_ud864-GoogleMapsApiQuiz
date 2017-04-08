@@ -365,7 +365,7 @@ API Course, Lesson 1 -->
 
        /*FUNCTION: ZOOMING IN ON DESIRED REGION*/
        function zoomToArea(userDesire) {
-         let place = new google.maps.Geocoder();
+         let place = new google.maps.Geocoder(); //THIS IS asynchronous SO YOU HAVE TO BE MINDFUL THAT ITS RESULTS WON'T COME UNTIL AFTER YOU PLACE A CALL TO DistanceMatrixService LATER
          if (userDesire == "") {
            window.alert("You must enter an area or address.")
          } else {
@@ -400,7 +400,7 @@ API Course, Lesson 1 -->
            }
            let destination = address;
            let mode = document.getElementById('mode').value;
-           dms.getDistanceMatrix(
+           dms.getDistanceMatrix( //THERE'S SOMETHING ABOUT THE async RUNNING OF THIS THAT MAKES THE PROPERTIES UNAVAILABLE TILL LAST
              {
                origins: origins,
                destinations: [destination],
@@ -440,7 +440,11 @@ API Course, Lesson 1 -->
                  atLeastOneGoodResult = true
                  let infowindow = new google.maps.InfoWindow(
                    {
-                     content: thisDurationText + " away" + thisDistanceText
+                     content: thisDurationText + " away" + thisDistanceText +
+                     '<div>' +
+                        '<input type=\"button\" value=\"View Route\" ' +
+                        'onclick=\"displayDirections(&quot;' + origins[i] +
+                        '&quot;);\"></input></div>'
                    }
                  )
                  infowindow.open(map,markers[i])
