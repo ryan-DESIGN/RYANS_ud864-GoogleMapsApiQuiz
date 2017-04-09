@@ -194,6 +194,18 @@ API Course, Lesson 1 -->
        let highlightedIcon = makeMarkerIcon(pinHighlight);//HOVER COLOR
 
        let bounds = new google.maps.LatLngBounds();
+
+       /*SUPPLIES DROPDOWN OF OPTIONS AS USER TYPES*/
+       let timeAutocomplete = new google.maps.places.Autocomplete(
+         document.getElementById('user-max-travel-duration-text')
+       )
+       let zoomAutocomplete = new google.maps.places.Autocomplete(
+         document.getElementById('zoom-to-area-text') //geocoder ENTRY BOX
+         //YOU CAN ADD .bounds(LATLNG) TO CONSTRAIN OPTIONS OFFERED TO USER
+         //ALSO ADD .types(addresses OR establishments)
+         //ALSO ADD .components(ONLY-THIS-COUNTRY) TO RESTRICT COUNTRY
+       )
+
        let locations = [
          {title: "Somewhe", location: {lat: 40.7129, lng:-74.0059}, }, //-89.9 MAX
          {title: 'Park',    location: {lat: 40.7128, lng:-74.0058}, },
@@ -331,6 +343,9 @@ API Course, Lesson 1 -->
               measurePolygonArea()); //AND MEASURE IT AGAIN
         });
 
+    }//CLOSE initMap
+
+
        /*function: USER'S DRAWN SHAPE HIDES ALL markers OUTSIDE THE SHAPE*/
        function searchWithinPolygon() {
          for (var i = 0; i < markers.length; i++) {
@@ -461,8 +476,39 @@ API Course, Lesson 1 -->
          }
        }
 
+       /*FUNCTION: DRAWS  ROUTE AFTER USER CHOOSES 'SHOW ROUTE' ON A MARKER*/
+       function displayDirections(origin) {
+         hideListings()
+         let directionsService = new google.maps.DirectionsService
+         let destinationAddress = document.getElementById('user-max-travel-duration').value
+         let mode = document.getElementById('mode').value
+         directionsService.route(
+           {
+             origin: origin,
+             destination: destinationAddress,
+             travelMode: google.maps.TravelMode[mode],
+             unitSystem: google.maps.UnitSystem.IMPERIAL
+           },
+           function(response, status) { //GOOGLE'S ANONYMOUS HANDLER FUNCTION
+             if(status === google.maps.DirectionsStatus.OK) {
+               let directionsDisplay = new google.maps.DirectionsRenderer(
+                 {
+                   map: map,
+                   directions: response,
+                   draggable: true,
+                   polylineOptions: {
+                     strokeColor: 'green'
+                   }
+                 }
+               )
+             } else {
+               window.alert("DirectionsRenderer failed because of " + status)
+             }
+           }
+         )
+       }
 
-     }//CLOSE initMap
+
 
 
    </script>
