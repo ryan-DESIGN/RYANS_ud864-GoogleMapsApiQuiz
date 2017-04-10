@@ -2,518 +2,748 @@
 <!-- This is the corresponding "starter code" for 04_Hello Map in Udacity and Google's Maps
 API Course, Lesson 1 -->
 <html>
- <head>
- <!-- styles put here, but you can include a CSS file and reference it instead! -->
-   <style type="text/css">
-     html, body { height: 100%; margin: 0; padding: 0; }
-     #map {
-       height: 100%;
-       bottom: 0;
-       left: 362px;
-       position: absolute;
-       right: 0;
-     }
-     #pano {
-       width: 200px;
-       height: 200px;
-     }
-     .options-box {
-       background: #fff;
-       border: 1px solid #999;
-       border-radius: 3px;
-       height: 100%;
-       line-height: 35px;
-       padding: 10px 10px 30px 10px;
-       text-align: left;
-       width: 340px;
-     }
-     #user-max-travel-duration-text {
-       width: 84%;
-     }
-     .text {
-       font-size: 12px;
-     }
-     #toggle-drawing {
-       width: 27%;
-       position: relative;
-       margin-left: 10px;
-     }
 
-
-   </style>
- </head>
- <body>
-
-   <div class="container">
-     <div class="options-box">
-       <h1>Find your South Pole home.</h1>
-       <div>
-         <input id="show-listings" type="button" value="Show Listings">
-         <input id="hide-listings" type="button" value="Hide Listings">
-         <hr>
-         <span class="text">draw a shape to search within it for homes</span>
-         <input id="toggle-drawing" type="button" value="Drawing Tools">
-         <hr>
-         <input id="zoom-to-area-text" type="text" placeholder="Enter your favorite area">
-         <input id="zoom-to-area" type="button" value="Zoom">
-         <hr>
-         <div>
-           <span class="text"> Within </span>
-           <select id="max-duration">//MAX TIME THE USER WANT TO COMMUTE
-             <option value="10">10 min</option>
-             <option value="15">15 min</option>
-             <option value="30">30 min</option>
-             <option value="60">60 min</option>
-           </select>
-           <select id="mode">//MODE OF COMMUTE
-             <option value="Driving">Driving</option>
-             <option value="Walking">Walking</option>
-             <option value="Bicycling">Bicycling</option>
-             <option value="Transit">Transit</option>
-           </select>
-           <span class="text">of</span>
-           <input id="user-max-travel-duration-text" type="text" placeholder="e.g., Google Office NYC">
-           <input id="user-max-travel-duration" type="button" value="Go">
-         </div>
-       </div>
-     </div>
-     <div id="map"></div><!-- TODO 1: Create a place to put the map in the HTML-->
-   </div>
-
-   <script>
-     // TODO: Create a map variable
-     let map;
-     let markers = []; //BLANK GLOBAL ARRAY TO HOLD ALL LOCATION LISTINGS ON THIS SITE
-
-     let polygon = null; //FOR DRAWING, AT BOTTOM OF THIS FILE
-     // TODO: Complete the following function to initialize the map
-     function initMap() {
-        let styles = [
-            {
-                featureType: "all",
-                stylers: [
-                    {"visibility": "off"},
-                ]
-            },{
-                "featureType": "water",
-                "stylers": [
-                    {"visibility": "on"},
-                    {"lightness": -100},
-                    {"color": "#ff3388"},
-                ]
-            },{
-                featureType: "administrative",
-                elementType: 'labels.text.stroke',
-                stylers: [
-                    {'visibility': 'on'},
-                    {'color': "#0f380f"},
-                    {weight: 6},
-                ]
-            },{
-                featureType: 'road.highway',
-                elementType: 'geometry.stroke',
-                stylers: [
-                  {visibility: 'on'},
-                  {color: '#38ff28'},
-                  {lightness: -40},
-                ]
-            },{
-              featureType: 'transit.station',
-              stylers: [
-                {visibility: 'on'},
-                {weight: 9},
-                {hue: '#ff5180'},
-              ]
-            }
-        ];
-       // TODO: use a constructor to create a new map JS object. You can use the coordinates
-       // we used, 40.7413549, -73.99802439999996 or your own!
-       map = new google.maps.Map(document.getElementById('map'), {
-         center: {lat: 40.7129, lng:-74.0050},
-         styles: styles, //SETS IT TO THE CRAZY COLORS IN THE ARRAY DEFINED ABOVE
-         zoom: 12, //MAX IS 21
-         mapTypeControl: false, //PREVENTS TERRAIN/SATELLITE/ROAD OPTIONS
-       });
-       //
-
-       var pinColor = "00ddee";
-       var pinHighlight = "11eeff";
-       var pinImage = new google.maps.MarkerImage(
-         "http://chart.apis.google.com/chart?chst=d_map_pin_letter&chld=%E2%80%A2|" +
-            pinColor,
-          new google.maps.Size(21, 34),
-          new google.maps.Point(0,0),
-          new google.maps.Point(10, 34)
-        );
-        var pinShadow = new google.maps.MarkerImage(
-          "http://chart.apis.google.com/chart?chst=d_map_pin_shadow",
-            new google.maps.Size(40, 37),
-            new google.maps.Point(0, 0),
-            new google.maps.Point(12, 35)
-        );
-
-
-       /* LOCATIONS*/
-       let largeInfowindow = new google.maps.InfoWindow();
-
-       //DRAWING LIBRARY
-       var drawingManager = new google.maps.drawing.DrawingManager({
-         drawingMode: google.maps.drawing.OverlayType.POLYGON,
-         drawingControl: true,
-         drawingControlOptions:  {
-           position: google.maps.ControlPosition.TOP_LEFT,
-           drawingModes: [
-             google.maps.drawing.OverlayType.POLYGON
-           ]
-         }
-       });
-       drawingManager.setMap(map);
-
-       let makeMarkerIcon = function(markerColor){
-         let markerImage = new google.maps.MarkerImage(
-           'http://chart.apis.google.com/chart?chst=d_map_spin&chld=1.15|0|' +
-           markerColor +
-           '|40|_|%E2%80%A2',
-           new google.maps.Size(40, 100),
-           new google.maps.Point(0, 0),
-           new google.maps.Point(10, 40),
-           new google.maps.Size(21, 34)
-         );
-         return markerImage;
-       }
-
-       function toggleDrawing(drawingManager) {
-         if(drawingManager.map){
-           drawingManager.setMap(null);
-         } else {
-           drawingManager.setMap(map);
-         }
-       }
-
-       let defaultIcon = makeMarkerIcon(pinColor);//BASIC ICON COLOR
-       let highlightedIcon = makeMarkerIcon(pinHighlight);//HOVER COLOR
-
-       let bounds = new google.maps.LatLngBounds();
-
-       /*SUPPLIES DROPDOWN OF OPTIONS AS USER TYPES*/
-       let timeAutocomplete = new google.maps.places.Autocomplete(
-         document.getElementById('user-max-travel-duration-text')
-       )
-       let zoomAutocomplete = new google.maps.places.Autocomplete(
-         document.getElementById('zoom-to-area-text') //geocoder ENTRY BOX
-         //YOU CAN ADD .bounds(LATLNG) TO CONSTRAIN OPTIONS OFFERED TO USER
-         //ALSO ADD .types(addresses OR establishments)
-         //ALSO ADD .components(ONLY-THIS-COUNTRY) TO RESTRICT COUNTRY
-       )
-
-       let locations = [
-         {title: "Somewhe", location: {lat: 40.7129, lng:-74.0059}, }, //-89.9 MAX
-         {title: 'Park',    location: {lat: 40.7128, lng:-74.0058}, },
-         {title: 'House',   location: {lat: 40.7127, lng:-74.0057}, },
-         {title: 'Field',   location: {lat: 40.7126, lng:-74.0056}, },
-         {title: 'Bank',    location: {lat: 40.7125, lng:-74.0055}, },
-         {title: 'School',  location: {lat: 40.7124, lng:-74.0054}, },
-         {title: 'Garage',  location: {lat: 40.7123, lng:-74.0053}, },
-         {title: 'Dump',    location: {lat: 40.7122, lng:-74.0052}, },
-         {title: 'Library', location: {lat: 40.7121, lng:-74.0051}, },
-       ];
-       for (var i = 0; i < locations.length; i++) { //CREATE MARKERS FROM markers
-             let tit = locations[i].title;
-             let pos = locations[i].location;
-             let marker = new google.maps.Marker({
-               map: map,
-               title: tit,
-               position: pos,
-               icon: defaultIcon,
-               shadow: pinShadow,
-               animation: google.maps.Animation.DROP,
-               id: i,
-             });
-             markers.push(marker); //PUSH IT ONTO THE GLOBAL markers ARRAY
-             bounds.extend(marker.position);
-             marker.addListener('click', function(){
-               populateInfoWindow(this, largeInfowindow);
-             });
-             marker.addListener('mouseover', function() {
-               this.setIcon(highlightedIcon);
-             });
-             marker.addListener('mouseout', function(){
-               this.setIcon(defaultIcon);
-             });
-       }
-       /*POPULATES THE largeInfowindow WHEN ANY MARKER IS CLICKED, ATOP THAT MARKER ONLY*/
-       function populateInfoWindow(marker, infowindow){
-         if(infowindow.marker != marker){//CHECK TO BE SURE AN infowindow ISN'T ALREADY OPEN ON THIS marker
-           infowindow.marker = marker;
-           infowindow.setContent('<div>' + marker.title + '</div>');
-           infowindow.open(map, marker);
-           infowindow.addListener('closeclick', function(){//MAKE SURE marker PROPERTY IS CLEARED WHEN THE infowindow GETS CLOSED
-             infowindow.marker = null;
-           });
-         }
-       }
-       map.fitBounds(bounds);
-
-       function showListings() {//LOOPS THROUGH markers ARRAY AND DISPLAYS THEM ALL, EXTENDING THE BOUNDS MEANWHILE
-         var bounds = new google.maps.LatLngBounds();
-         for (var i = 0; i < markers.length; i++) {
-           markers[i].setMap(map);
-           bounds.extend(markers[i].position);
-         }
-         map.fitBounds(bounds);
-       }
-       function hideListings() {//LOOPS THROUGH markers AND HIDES THEM ALL
-         for ( var i = 0; i <markers.length; i++) {
-           markers[i].setMap(null);//THIS DOESN"T DELETE ANY marker, IT JUST CHANGES THE DISPLAY AREA TO null, SO HIDES IT
-         }
-       }
-
-       let streetviewservice = new google.maps.StreetViewService();
-
-       let testMarker = new google.maps.Marker({ //I NNED THIS TO KEEP FROM HAVING TO RUN A for LOOP ON markers JUST TO TEST THIS FEATURE OUT
-         map: map,
-         radius: 30,
-         position: {lat: 40.7129, lng:-74.0050}, //NYC
-         title: "DRAWING TEST MARKER",
-         icon: highlightedIcon,
-         animation: google.maps.Animation.BOUNCE,
-       });
-
-       let infowindow = new google.maps.InfoWindow({
-         content: "Do you ever feel, like an InfoWindow, " +
-          "floating through the map?",
-       });
-       testMarker.addListener('click', function(){
-         infowindow.open(map, testMarker);
-       });
-
-       function getStreetView(data, status) {
-        if(status == google.maps.StreetViewService.OK){
-           var nearStreetViewLocation = data.location.latLng;
-           var heading = google.maps.geometry.spherical.computeHeading(nearStreetViewLocation, testMarker.position);
-           infowindow.setContent('<div>' + testMarker.title + '</div><div id="pano"></div>');
-           var panoramaOptions = {
-             position: nearStreetViewLocation,
-             pov: {
-               heading: heading,
-               pitch: 30
-             }
-           };
-           var panorama = new google.maps.StreetViewPanorama(document.getElementById('pano'), panoramaOptions);
-        } else {
-            infowindow.setContent('<div>' + testMarker.title + '</div>' +
-              '<div>No Street View Found</div>'
-            );
+<head>
+    <!-- styles put here, but you can include a CSS file and reference it instead! -->
+    <style type="text/css">
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
         }
-       }
 
-       radius = 30;
+        #map {
+            height: 100%;
+            bottom: 0;
+            left: 362px;
+            position: absolute;
+            right: 0;
+        }
 
-       streetviewservice.getPanoramaByLocation(testMarker.position, radius, getStreetView);
+        #pano {
+            width: 200px;
+            height: 200px;
+        }
 
+        .options-box {
+            background: #fff;
+            border: 1px solid #999;
+            border-radius: 3px;
+            height: 100%;
+            line-height: 35px;
+            padding: 10px 10px 30px 10px;
+            text-align: left;
+            width: 340px;
+        }
 
+        #user-max-travel-duration-text {
+            width: 84%;
+        }
 
+        .text {
+            font-size: 12px;
+        }
 
-       document.getElementById('show-listings').addEventListener('click', showListings);
-       document.getElementById('hide-listings').addEventListener('click', hideListings);
+        #toggle-drawing {
+            width: 27%;
+            position: relative;
+            margin-left: 10px;
+        }
+    </style>
+</head>
 
-       document.getElementById('toggle-drawing').addEventListener('click', function() {
-         toggleDrawing(drawingManager);
-       });
+<body>
 
-       document.getElementById('zoom-to-area').addEventListener('click', function() {
-         zoomToArea(document.getElementById('zoom-to-area-text').value);
-       });
+    <div class="container">
+        <div class="options-box">
+            <h1>Find your South Pole home.</h1>
+            <div>
+                <input id="show-listings" type="button" value="Show Listings">
+                <input id="hide-listings" type="button" value="Hide Listings">
+                <hr>
+                <span class="text">draw a shape to search within it for homes</span>
+                <input id="toggle-drawing" type="button" value="Drawing Tools">
+                <hr>
+                <input id="zoom-to-area-text" type="text" placeholder="Enter your favorite area">
+                <input id="zoom-to-area" type="button" value="Zoom">
+                <hr>
+                <div>
+                    <span class="text"> Within </span>
+                    <select id="max-duration"><!--MAX TIME THE USER WANT TO COMMUTE-->
+                       <option value="10">10 min</option>
+                       <option value="15">15 min</option>
+                       <option value="30">30 min</option>
+                       <option value="60">60 min</option>
+                    </select>
+                    <select id="mode"><!--MODE OF COMMUTE-->
+                       <option value="DRIVING">Driving</option><!--value MUST BE IN ALL CAPS!-->
+                       <option value="WALKING">Walking</option>
+                       <option value="BICYCLING">Bicycling</option>
+                       <option value="TRANSIT">Transit</option>
+                    </select>
+                    <span class="text">of</span>
+                    <input id="user-max-travel-duration-text" type="text" placeholder="e.g., Google Office NYC">
+                    <input id="user-max-travel-duration" type="button" value="Go">
+                </div>
+            </div>
+            <div>
+              <span class="text">Search by common vernacular</span>
+              <input id="places-search" type="text" placeholder="Ex: type of food near my office">
+              <input id="go-places" type="button" value="Go">
+            </div>
+        </div>
+        <div id="map"></div>
+        <!-- TODO 1: Create a place to put the map in the HTML-->
+    </div>
 
-       document.getElementById('user-max-travel-duration').addEventListener('click', function(){
-         searchWithinTime();
-       });
+    <script>
+        /*GLOBALS*/
+        let map;
+        let markers = []; //BLANK GLOBAL ARRAY TO HOLD ALL LOCATION LISTINGS ON THIS SITE
+        let polygon = null; //FOR DRAWING, AT BOTTOM OF THIS FILE
+        let placeMarkers = [] //ALLOWS FOR CONTROL OVER NUMBER OF PLACES SHOWN ON MAP
 
-       drawingManager.addListener('overlaycomplete', function(event){
-           if(polygon) {//CHECK FOR EXISTING POLYGONS DRAWN ON MAP
-             polygon.setMap(null);//REMOVE THE OLD POLYGON BY SENDING IT INTO THE null ABYSS
-             hideListings(); //REMOVE ANY MARKERS
-           }
-           drawingManager.setDrawingMode(null);//SWITCH MODE TO THE LITTLE HAND, I.E. STOPS DRAWING!
-           polygon = event.overlay;//CREATE A NEW...
-           polygon.setEditable(true);//EDITABLE POLYGON FROM THE OVERLAY
-           polygon.getPath().addListener('set_at', searchWithinPolygon, //SEARCH AFTER ANY POINTS ARE CREATED/MOVED
-              measurePolygonArea()); //AND MEASURE IT AGAIN
-           polygon.getPath().addListener('insert_at', searchWithinPolygon,//SEARCH AFTER ANY POINTS ARE INSERTED
-              measurePolygonArea()); //AND MEASURE IT AGAIN
-        });
+        // TODO: Complete the following function to initialize the map
+        function initMap() {
+          let April1_2016 = new Date(2016, 4, 1)
+          console.log(April1_2016.getTime())
+            let styles = [{}]
+            //     featureType: "all",
+            //     stylers: [{
+            //         "visibility": "off"
+            //     }, ]
+            // }, {
+            //     "featureType": "water",
+            //     "stylers": [{
+            //             "visibility": "on"
+            //         },
+            //         {
+            //             "lightness": -100
+            //         },
+            //         {
+            //             "color": "#ff3388"
+            //         },
+            //     ]
+            // }, {
+            //     featureType: "administrative",
+            //     elementType: 'labels.text.stroke',
+            //     stylers: [{
+            //             'visibility': 'on'
+            //         },
+            //         {
+            //             'color': "#0f380f"
+            //         },
+            //         {
+            //             weight: 6
+            //         },
+            //     ]
+            // }, {
+            //     featureType: 'road.highway',
+            //     elementType: 'geometry.stroke',
+            //     stylers: [{
+            //             visibility: 'on'
+            //         },
+            //         {
+            //             color: '#38ff28'
+            //         },
+            //         {
+            //             lightness: -40
+            //         },
+            //     ]
+            // }, {
+            //     featureType: 'transit.station',
+            //     stylers: [{
+            //             visibility: 'on'
+            //         },
+            //         {
+            //             weight: 9
+            //         },
+            //         {
+            //             hue: '#ff5180'
+            //         },
+            //     ]
+            // }];
+            // TODO: use a constructor to create a new map JS object. You can use the coordinates
+            // we used, 40.7413549, -73.99802439999996 or your own!
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: {
+                    lat: 40.7129,
+                    lng: -74.0050
+                },
+                styles: styles, //SETS IT TO THE CRAZY COLORS IN THE ARRAY DEFINED ABOVE
+                zoom: 12, //MAX IS 21
+                mapTypeControl: false, //PREVENTS TERRAIN/SATELLITE/ROAD OPTIONS
+            });
+            //
 
-    }//CLOSE initMap
-
-
-       /*function: USER'S DRAWN SHAPE HIDES ALL markers OUTSIDE THE SHAPE*/
-       function searchWithinPolygon() {
-         for (var i = 0; i < markers.length; i++) {
-           if (google.maps.geometry.poly.containsLocation(markers[i].position, polygon)) {
-             markers[i].setMap(map);
-           } else {
-             markers[i].setMap(null);
-           }
-         }
-       }
-       /*function: RECEIVES THE polygon, CHECKS IF IT'S ALONE, RETURNS CALCULATED AREA*/
-       function measurePolygonArea() {
-         let vertices = polygon.getPath()
-         let xyarr= []
-         /*I'LL PULL A VERTEX AND STORE IT IN THE holder ARRAY */
-         for(var vertex = 0; vertex < vertices.length; vertex++) {
-           xyarr[vertex] = {}//ADD AN OBJECT TO THE ARRAY
-           xyarr[vertex].x = vertices.getAt(vertex).lat//DEFINE ITS x PROPERY
-           xyarr[vertex].y = vertices.getAt(vertex).lng//DEFINE ITS y PROPERY
-         }
-         /*RUN THROUGH ALL THE X/Y PAIRS IN xyarr*/
-         for(var i = 0; i < xyarr.length; i++) {
-           for(var j = 0; j < Object.keys(xyarr[i]).length; j++) {
-             console.log(xyarr[j].x)
-             console.log(xyarr[j].y)
-           }
-         }
-         /*OR JUST DO THIS INSTEAD...*/
-         var areaOfPolygon = google.maps.geometry.spherical.computeArea(polygon.getPath());
-         window.alert(Math.ceil(areaOfPolygon) + " SQUARE METERS");
-       }
-
-       /*FUNCTION: ZOOMING IN ON DESIRED REGION*/
-       function zoomToArea(userDesire) {
-         let place = new google.maps.Geocoder(); //THIS IS asynchronous SO YOU HAVE TO BE MINDFUL THAT ITS RESULTS WON'T COME UNTIL AFTER YOU PLACE A CALL TO DistanceMatrixService LATER
-         if (userDesire == "") {
-           window.alert("You must enter an area or address.")
-         } else {
-           place.geocode(
-             {
-               address: userDesire,
-               componentRestrictions: {country: 'US'}//LIMITS THE SEARCH TO THIS REGION
-             },
-             function(results, status) {
-               if (status == google.maps.GeocoderStatus.OK) {//IF REQUEST WAS SUCCESSFUL
-                 map.setCenter(results[0].geometry.location);
-                 map.setZoom(15);
-               } else {
-                 window.alert("We couldn't find that location. Be more specific.")
-               }
-             }
-           )
-         }
-       }
-
-       /*FUNCTION: RETURNS ROUTES THAT FIT USER'S DURATION, MODE, AND DESTINATION CONSTRAINTS*/
-       function searchWithinTime() {
-         let dms = new google.maps.DistanceMatrixService();
-         let address = document.getElementById('user-max-travel-duration-text').value;
-         if(address == '') {
-           window.alert("You need to enter an address for this to work.");
-         } else {
-           hideListings();
-           let origins = [];//calculate routes between all our markers and user's destination
-           for (var i = 0; i< markers.length; i++) {
-             origins[i] = markers[i].position;
-           }
-           let destination = address;
-           let mode = document.getElementById('mode').value;
-           dms.getDistanceMatrix( //THERE'S SOMETHING ABOUT THE async RUNNING OF THIS THAT MAKES THE PROPERTIES UNAVAILABLE TILL LAST
-             {
-               origins: origins,
-               destinations: [destination],
-               travelMode: google.maps.TravelMode[mode],
-               unitSystem: google.maps.UnitSystem.IMPERIAL
-             },
-             function(results,status){
-               if(status !== google.maps.DistanceMatrixStatus.OK){
-                 window.alert("ERROR " + status)
-               } else {
-                 displayMarkersThatFallWithinUsersRange(results)
-               }
-             }
-           )
-         }
-       }
-       /*FUNCTION: SUPPLEMENTS THE FUNCTION ABOVE, REALLY SHOULD BE INSIDE IT.
-       * RUNS THROUGH EVERY RESULT IN THE RESPONSE AND COMPARES IT TO THE
-       * USER'S user-max-travel-duration-text VALUE.
-       * IF IT'S LESS, THAT DESTINATION GETS DISPLAYED ON THE MAP.
-       */
-       function displayMarkersThatFallWithinUsersRange(results) {
-         let userMaxDuration = document.getElementById('user-max-travel-duration').value
-         let origins = results.originAddresses
-         let destinations = results.destinationAddresses
-         let atLeastOneGoodResult = false //BOOL TO TELL IF IT'S WORTH DOING
-         for( var i = 0; i < origins.length; i++ ) {
-           let resultsHolder = results.rows[i].elements
-           for(var j = 0; j < resultsHolder.length; j++) {
-             let element = resultsHolder[j]
-             if ( element.status === 'OK') {
-               let thisDistanceText = element.distance.text
-               let thisDuration = element.duration.value / 60
-               let thisDurationText = element.duration.text
-               if(thisDuration <= userMaxDuration) {
-                 markers[i].setMap(map)
-                 atLeastOneGoodResult = true
-                 let infowindow = new google.maps.InfoWindow(
-                   {
-                     content: thisDurationText + " away" + thisDistanceText +
-                     '<div>' +
-                        '<input type=\"button\" value=\"View Route\" ' +
-                        'onclick=\"displayDirections(&quot;' + origins[i] +
-                        '&quot;);\"></input></div>'
-                   }
-                 )
-                 infowindow.open(map,markers[i])
-                 markers[i].infowindow = infowindow
-                 google.maps.event.addListener(markers[i], 'click', function(){
-                   this.infowindow.close()
-                 })
-               }
-             }
-           }
-         }
-         if (!atLeastOneGoodResult) {
-           window.alert('We could not find any locations within that distance!');
-         }
-       }
-
-       /*FUNCTION: DRAWS  ROUTE AFTER USER CHOOSES 'SHOW ROUTE' ON A MARKER*/
-       function displayDirections(origin) {
-         hideListings()
-         let directionsService = new google.maps.DirectionsService
-         let destinationAddress = document.getElementById('user-max-travel-duration').value
-         let mode = document.getElementById('mode').value
-         directionsService.route(
-           {
-             origin: origin,
-             destination: destinationAddress,
-             travelMode: google.maps.TravelMode[mode],
-             unitSystem: google.maps.UnitSystem.IMPERIAL
-           },
-           function(response, status) { //GOOGLE'S ANONYMOUS HANDLER FUNCTION
-             if(status === google.maps.DirectionsStatus.OK) {
-               let directionsDisplay = new google.maps.DirectionsRenderer(
-                 {
-                   map: map,
-                   directions: response,
-                   draggable: true,
-                   polylineOptions: {
-                     strokeColor: 'green'
-                   }
-                 }
-               )
-             } else {
-               window.alert("DirectionsRenderer failed because of " + status)
-             }
-           }
-         )
-       }
+            var pinColor = "00ddee";
+            var pinHighlight = "11eeff";
+            var pinImage = new google.maps.MarkerImage(
+                "http://chart.apis.google.com/chart?chst=d_map_pin_letter&chld=%E2%80%A2|" +
+                pinColor,
+                new google.maps.Size(21, 34),
+                new google.maps.Point(0, 0),
+                new google.maps.Point(10, 34)
+            );
+            var pinShadow = new google.maps.MarkerImage(
+                "http://chart.apis.google.com/chart?chst=d_map_pin_shadow",
+                new google.maps.Size(40, 37),
+                new google.maps.Point(0, 0),
+                new google.maps.Point(12, 35)
+            );
 
 
+            /* LOCATIONS*/
+            let infowindow = new google.maps.InfoWindow({
+                content: "Do you ever feel, like an InfoWindow, " +
+                    "floating through the map?",
+            });
+            //DRAWING LIBRARY
+            var drawingManager = new google.maps.drawing.DrawingManager({
+                drawingMode: google.maps.drawing.OverlayType.POLYGON,
+                drawingControl: true,
+                drawingControlOptions: {
+                    position: google.maps.ControlPosition.TOP_LEFT,
+                    drawingModes: [
+                        google.maps.drawing.OverlayType.POLYGON
+                    ]
+                }
+            });
+            drawingManager.setMap(map);
+
+            let makeMarkerIcon = function(markerColor) {
+                let markerImage = new google.maps.MarkerImage(
+                    'http://chart.apis.google.com/chart?chst=d_map_spin&chld=1.15|0|' +
+                    markerColor +
+                    '|40|_|%E2%80%A2',
+                    new google.maps.Size(40, 100),
+                    new google.maps.Point(0, 0),
+                    new google.maps.Point(10, 40),
+                    new google.maps.Size(21, 34)
+                );
+                return markerImage;
+            }
+
+            function toggleDrawing(drawingManager) {
+                if (drawingManager.map) {
+                    drawingManager.setMap(null);
+                } else {
+                    drawingManager.setMap(map);
+                }
+            }
+
+            let defaultIcon = makeMarkerIcon(pinColor); //BASIC ICON COLOR
+            let highlightedIcon = makeMarkerIcon(pinHighlight); //HOVER COLOR
+            let bounds = new google.maps.LatLngBounds();
+
+            /*places.Autocomplete: SUPPLIES DROPDOWN OPTIONS AS USER TYPES*/
+            let timeAutocomplete = new google.maps.places.Autocomplete(
+                document.getElementById('user-max-travel-duration-text'),
+                {
+                  bounds: bounds,//YOU CAN ADD bounds: LatLngBounds(OBJECT,OBJECT) TO CONSTRAIN OPTIONS OFFERED TO USER
+                  types: ['addresses', 'establishments'],//ALSO ADD .types(addresses OR establishments)
+                  components: 'country'//ALSO ADD .components(ONLY-THIS-COUNTRY) TO RESTRICT COUNTRY
+                }
+            )
+            let zoomAutocomplete = new google.maps.places.Autocomplete(
+                document.getElementById('zoom-to-area-text'),
+                {
+                  bounds: bounds
+                }
+            )
+            zoomAutocomplete.bindTo('bounds', map)//BINDS THE AUTOCOMPLETE SUGGESTIONS TO MAP DISPLAYED AREA
+
+            /*places.SearchBox: SUPPLIES DROPDOWN OPTIONS OF COMMON PHRASES WITHOUT POSSIBLY ADDING CONSTRAINTS*/
+            let searchBox = new google.maps.places.SearchBox(
+              document.getElementById('places-search'),
+              {
+                setBounds: map.getBounds()//BIAS SEARCH SUGGESTIONS TO MAP DISPLAY AREA
+              }
+            )
+
+            let locations = [{
+                    title: "Somewhe",
+                    location: {
+                        lat: 40.7129,
+                        lng: -74.0059
+                    },
+                }, //-89.9 MAX
+                {
+                    title: 'Park',
+                    location: {
+                        lat: 40.7128,
+                        lng: -74.0058
+                    },
+                },
+                {
+                    title: 'House',
+                    location: {
+                        lat: 40.7127,
+                        lng: -74.0057
+                    },
+                },
+                {
+                    title: 'Field',
+                    location: {
+                        lat: 40.7126,
+                        lng: -74.0056
+                    },
+                },
+                {
+                    title: 'Bank',
+                    location: {
+                        lat: 40.7125,
+                        lng: -74.0055
+                    },
+                },
+                {
+                    title: 'School',
+                    location: {
+                        lat: 40.7124,
+                        lng: -74.0054
+                    },
+                },
+                {
+                    title: 'Garage',
+                    location: {
+                        lat: 40.7123,
+                        lng: -74.0053
+                    },
+                },
+                {
+                    title: 'Dump',
+                    location: {
+                        lat: 40.7122,
+                        lng: -74.0052
+                    },
+                },
+                {
+                    title: 'Library',
+                    location: {
+                        lat: 40.7121,
+                        lng: -74.0051
+                    },
+                },
+            ];
+            for (var i = 0; i < locations.length; i++) { //CREATE MARKERS FROM markers
+                let tit = locations[i].title;
+                let pos = locations[i].location;
+                let marker = new google.maps.Marker({
+                    map: map,
+                    title: tit,
+                    position: pos,
+                    icon: defaultIcon,
+                    shadow: pinShadow,
+                    animation: google.maps.Animation.DROP,
+                    id: i,
+                });
+                markers.push(marker); //PUSH IT ONTO THE GLOBAL markers ARRAY
+                bounds.extend(marker.position);
+                marker.addListener('click', function() {
+                    populateInfoWindow(this, infowindow);
+                });
+                marker.addListener('mouseover', function() {
+                    this.setIcon(highlightedIcon);
+                });
+                marker.addListener('mouseout', function() {
+                    this.setIcon(defaultIcon);
+                });
+            }
+            /*POPULATES THE infowindow WHEN ANY MARKER IS CLICKED, ATOP THAT MARKER ONLY*/
+            function populateInfoWindow(marker, infowindow) {
+                if (infowindow.marker != marker) { //CHECK TO BE SURE AN infowindow ISN'T ALREADY OPEN ON THIS marker
+                    infowindow.marker = marker;
+                    infowindow.setContent('<div>' + marker.title + '</div>');
+                    infowindow.open(map, marker);
+                    infowindow.addListener('closeclick', function() { //MAKE SURE marker PROPERTY IS CLEARED WHEN THE infowindow GETS CLOSED
+                        infowindow.marker = null;
+                    });
+                }
+            }
+            map.fitBounds(bounds);
+
+            function showListings() { //LOOPS THROUGH markers ARRAY AND DISPLAYS THEM ALL, EXTENDING THE BOUNDS MEANWHILE
+                var bounds = new google.maps.LatLngBounds();
+                for (var i = 0; i < markers.length; i++) {
+                    markers[i].setMap(map);
+                    bounds.extend(markers[i].position);
+                }
+                map.fitBounds(bounds);
+            }
 
 
-   </script>
-   <!--TODO: Load the JS API ASYNCHRONOUSLY below.-->
-   <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyC6I8HiVEE3f_unE-O7Euas7E_8f96wePA&v=3&callback=initMap&libraries=drawing,geometry,places">
-   </script>
- </body>
+
+            let streetviewservice = new google.maps.StreetViewService();
+
+            let testMarker = new google.maps.Marker({ //I NNED THIS TO KEEP FROM HAVING TO RUN A for LOOP ON markers JUST TO TEST THIS FEATURE OUT
+                map: map,
+                radius: 30,
+                position: {
+                    lat: 40.7129,
+                    lng: -74.0050
+                }, //NYC
+                title: "DRAWING TEST MARKER",
+                icon: highlightedIcon,
+                animation: google.maps.Animation.DROP,
+            });
+
+            testMarker.addListener('click', function() {
+                infowindow.open(map, testMarker);
+            });
+
+            function getStreetView(data, status) {
+                if (status == google.maps.StreetViewService.OK) {
+                    var nearStreetViewLocation = data.location.latLng;
+                    var heading = google.maps.geometry.spherical.computeHeading(nearStreetViewLocation, testMarker.position);
+                    infowindow.setContent('<div>' + testMarker.title + '</div><div id="pano"></div>');
+                    var panoramaOptions = {
+                        position: nearStreetViewLocation,
+                        pov: {
+                            heading: heading,
+                            pitch: 30
+                        }
+                    };
+                    var panorama = new google.maps.StreetViewPanorama(document.getElementById('pano'), panoramaOptions);
+                } else {
+                    infowindow.setContent('<div>' + testMarker.title + '</div>' +
+                        '<div>No Street View Found</div>'
+                    );
+                }
+            }
+
+            radius = 30;
+
+            streetviewservice.getPanoramaByLocation(testMarker.position, radius, getStreetView);
+
+
+
+
+            document.getElementById('show-listings').addEventListener('click', showListings);
+            document.getElementById('hide-listings').addEventListener('click', hideMarkers);
+
+            document.getElementById('toggle-drawing').addEventListener('click', function() {
+                toggleDrawing(drawingManager);
+            });
+
+            document.getElementById('zoom-to-area').addEventListener('click', function() {
+                zoomToArea(document.getElementById('zoom-to-area-text').value);
+            });
+
+            document.getElementById('user-max-travel-duration').addEventListener('click', function() {
+                searchWithinTime();
+            });
+
+            /*LISTEN FOR THE EVENT THAT FIRES WHEN USER PICKS A DROP-DOWN SUGGESTION*/
+            searchBox.addListener('places-changed',function(){
+              searchBoxPlaces(this)
+            })
+            /*LISTEN FOR A click EVENT ON THE BUTTON, IF THE USER JUST TYPED SOMETHING RATHER THAT PICKING A SUGGESTION*/
+            document.getElementById('go-places').addEventListener('click', textSearchPlaces)//FIRE textSearchPlaces
+
+            drawingManager.addListener('overlaycomplete', function(event) {
+                if (polygon) { //CHECK FOR EXISTING POLYGONS DRAWN ON MAP
+                    polygon.setMap(null); //REMOVE THE OLD POLYGON BY SENDING IT INTO THE null ABYSS
+                    hideMarkers(markers); //REMOVE ANY MARKERS
+                }
+                drawingManager.setDrawingMode(null); //SWITCH MODE TO THE LITTLE HAND, I.E. STOPS DRAWING!
+                polygon = event.overlay; //CREATE A NEW...
+                polygon.setEditable(true); //EDITABLE POLYGON FROM THE OVERLAY
+                polygon.getPath().addListener('set_at', searchWithinPolygon, //SEARCH AFTER ANY POINTS ARE CREATED/MOVED
+                    measurePolygonArea()); //AND MEASURE IT AGAIN
+                polygon.getPath().addListener('insert_at', searchWithinPolygon, //SEARCH AFTER ANY POINTS ARE INSERTED
+                    measurePolygonArea()); //AND MEASURE IT AGAIN
+            });
+
+        } //CLOSE initMap
+
+
+        function hideMarkers(markers) { //LOOPS THROUGH markers AND HIDES THEM ALL
+            for (var i = 0; i < markers.length; i++) {
+                markers[i].setMap(null); //THIS DOESN"T DELETE ANY marker, IT JUST CHANGES THE DISPLAY AREA TO null, SO HIDES IT
+            }
+        }
+
+
+        /*function: USER'S DRAWN SHAPE HIDES ALL markers OUTSIDE THE SHAPE*/
+        function searchWithinPolygon() {
+            for (var i = 0; i < markers.length; i++) {
+                if (google.maps.geometry.poly.containsLocation(markers[i].position, polygon)) {
+                    markers[i].setMap(map);
+                } else {
+                    markers[i].setMap(null);
+                }
+            }
+        }
+        /*function: RECEIVES THE polygon, CHECKS IF IT'S ALONE, RETURNS CALCULATED AREA*/
+        function measurePolygonArea() {
+            let vertices = polygon.getPath()
+            let xyarr = []
+            /*I'LL PULL A VERTEX AND STORE IT IN THE holder ARRAY */
+            for (var vertex = 0; vertex < vertices.length; vertex++) {
+                xyarr[vertex] = {} //ADD AN OBJECT TO THE ARRAY
+                xyarr[vertex].x = vertices.getAt(vertex).lat //DEFINE ITS x PROPERY
+                xyarr[vertex].y = vertices.getAt(vertex).lng //DEFINE ITS y PROPERY
+            }
+            /*RUN THROUGH ALL THE X/Y PAIRS IN xyarr*/
+            for (var i = 0; i < xyarr.length; i++) {
+                for (var j = 0; j < Object.keys(xyarr[i]).length; j++) {
+                    console.log(xyarr[j].x)
+                    console.log(xyarr[j].y)
+                }
+            }
+            /*OR JUST DO THIS INSTEAD...*/
+            var areaOfPolygon = google.maps.geometry.spherical.computeArea(polygon.getPath());
+            window.alert(Math.ceil(areaOfPolygon) + " SQUARE METERS");
+        }
+
+        /*FUNCTION: ZOOMING IN ON DESIRED REGION*/
+        function zoomToArea(userDesire) {
+            let place = new google.maps.Geocoder(); //THIS IS asynchronous SO YOU HAVE TO BE MINDFUL THAT ITS RESULTS WON'T COME UNTIL AFTER YOU PLACE A CALL TO DistanceMatrixService LATER
+            if (userDesire == "") {
+                window.alert("You must enter an area or address.")
+            } else {
+                place.geocode({
+                        address: userDesire,
+                        componentRestrictions: {
+                            country: 'US'
+                        } //LIMITS THE SEARCH TO THIS REGION
+                    },
+                    function(results, status) {
+                        if (status == google.maps.GeocoderStatus.OK) { //IF REQUEST WAS SUCCESSFUL
+                            map.setCenter(results[0].geometry.location);
+                            map.setZoom(15);
+                        } else {
+                            window.alert("We couldn't find that location. Be more specific.")
+                        }
+                    }
+                )
+            }
+        }
+
+        /*FUNCTION: RETURNS ROUTES THAT FIT USER'S DURATION, MODE, AND DESTINATION CONSTRAINTS*/
+        function searchWithinTime() {
+            let dms = new google.maps.DistanceMatrixService();
+            let address = document.getElementById('user-max-travel-duration-text').value;
+            if (address == '') {
+                window.alert("You need to enter an address for this to work.");
+            } else {
+                this.hideMarkers(markers);
+                let origins = []; //calculate routes between all our markers and user's destination
+                for (var i = 0; i < markers.length; i++) {
+                    origins[i] = markers[i].position;
+                }
+                let destination = address;
+                let mode = document.getElementById('mode').value;
+                dms.getDistanceMatrix( //THERE'S SOMETHING ABOUT THE async RUNNING OF THIS THAT MAKES THE PROPERTIES UNAVAILABLE TILL LAST
+                    {
+                        origins: origins,
+                        destinations: [destination],
+                        travelMode: google.maps.TravelMode[mode],
+                        unitSystem: google.maps.UnitSystem.IMPERIAL
+                    },
+                    function(results, status) {
+                        if (status !== google.maps.DistanceMatrixStatus.OK) {
+                            window.alert("ERROR " + status)
+                        } else {
+                            displayMarkersThatFallWithinUsersRange(results)
+                        }
+                    }
+                )
+            }
+        }
+        /*FUNCTION: SUPPLEMENTS THE FUNCTION ABOVE, REALLY SHOULD BE INSIDE IT.
+         * RUNS THROUGH EVERY RESULT IN THE RESPONSE AND COMPARES IT TO THE
+         * USER'S user-max-travel-duration-text VALUE.
+         * IF IT'S LESS, THAT DESTINATION GETS DISPLAYED ON THE MAP.
+         */
+        function displayMarkersThatFallWithinUsersRange(results) {
+            let userMaxDuration = document.getElementById('user-max-travel-duration').value
+            let origins = results.originAddresses
+            let destinations = results.destinationAddresses
+            let atLeastOneGoodResult = false //BOOL TO TELL IF IT'S WORTH DOING
+            for (var i = 0; i < origins.length; i++) {
+                let resultsHolder = results.rows[i].elements
+                for (var j = 0; j < resultsHolder.length; j++) {
+                    let element = resultsHolder[j]
+                    if (element.status === 'OK') {
+                        let thisDistanceText = element.distance.text
+                        let thisDuration = element.duration.value / 60
+                        let thisDurationText = element.duration.text
+                        if (thisDuration <= userMaxDuration) {
+                            markers[i].setMap(map)
+                            atLeastOneGoodResult = true
+                            let thisinfowindow = new google.maps.InfoWindow({
+                                content: thisDurationText + " away" + thisDistanceText +
+                                    '<div>' +
+                                    '<input type=\"button\" value=\"View Route\" ' +
+                                    'onclick=\"displayDirections(&quot;' + origins[i] +
+                                    '&quot;);\"></input></div>'
+                            })
+                            thisinfowindow.open(map, markers[i])
+                            markers[i].infowindow = thisinfowindow
+                            google.maps.event.addListener(markers[i], 'click', function() {
+                                this.thisinfowindow.close()
+                            })
+                        }
+                    }
+                }
+            }
+            if (!atLeastOneGoodResult) {
+                window.alert('We could not find any locations within that distance!');
+            }
+        }
+
+        /*FUNCTION: DRAWS ROUTE AFTER USER CHOOSES 'SHOW ROUTE' ON A MARKER*/
+        function displayDirections(origin) {
+            hideMarkers(markers)
+            let directionsService = new google.maps.DirectionsService
+            let destinationAddress = document.getElementById('user-max-travel-duration').value
+            let mode = document.getElementById('mode').value
+            directionsService.route({
+                    origin: origin,
+                    destination: destinationAddress,
+                    travelMode: google.maps.TravelMode[mode],
+                    unitSystem: google.maps.UnitSystem.IMPERIAL
+                },
+                function(response, status) { //GOOGLE'S ANONYMOUS HANDLER FUNCTION
+                    if (status === google.maps.DirectionsStatus.OK) {
+                        let directionsDisplay = new google.maps.DirectionsRenderer({
+                            map: map,
+                            directions: response,
+                            draggable: true,
+                            polylineOptions: {
+                                strokeColor: 'green'
+                            }
+                        })
+                    } else {
+                        window.alert("DirectionsRenderer failed because of " + status)
+                    }
+                }
+            )
+        }
+
+        /*FUNCTION: DOES A CONSTRAINED SEARCH FROM USER-PICKED SUGGESTION IN SearchBox*/
+        function searchBoxPlaces(searchBox) {
+          hideMarkers(placeMarkers)
+          var places = searchBox.getPlaces()
+          createMarkersForPlaces(places)
+          if(places.length == 0) {
+            window.alert("We didn't find any places matching your criterium.")
+          }
+        }
+
+        /*FUNCTION: FIRES WHEN THE USER CHOOSE "Go" AFTER TYPING OUT A QUERY*/
+        function textSearchPlaces() {
+          let bounds = map.getBounds() //FIND THE CONSTRAINTS
+          hideMarkers(placeMarkers) //HIDE EXISTING PINS
+          let placesService = new google.maps.places.PlacesService(map)
+          placesService.textSearch( //
+            {
+              query: document.getElementById('places-search').value,
+              bounds: bounds
+            }, function(results, status) {
+              if(status === google.maps.places.PlacesServiceStatus.OK){
+                createMarkersForPlaces(results)
+              }
+            }
+          )
+        }
+
+        /*FUNCTION: */
+        function createMarkersForPlaces(places) {
+          let bounds = new google.maps.LatLngBounds()
+          for (var i = 0; i < places.length; i++) {
+            let place = places[i]
+            let icon = {
+              url: place.icon,
+              size: new google.maps.Size(35,35),
+              origin: new google.maps.Point(0,0),
+              anchor: new google.maps.Point(15,34),
+              scaledSize: new google.maps.Size(25,25),
+            }
+            let marker = new google.maps.Marker( //CREATE A MARKER FOR EACH PLACE
+              {
+                map: map,
+                icon: icon,
+                title: place.name,
+                position: place.geometry.location,
+                id: place.place_id,
+              }
+            )
+            let placeInfoWindow = new google.maps.InfoWindow() //CREATES A NEW INFOWINDOW SO ONLY ONE IS VISIBLE AT ONCE
+            marker.addListener('click', function(){ //ON CLICK, DO A PLACES.DETAILS SEARCH
+              if (placeInfoWindow.marker === this) {
+                console.log("The single infowindow you can have is already on this marker.")
+              } else {
+                getPlacesDetails(this, placeInfoWindow)
+              }
+            })
+            placeMarkers.push(marker)
+            /*ADJUST THE MAP BOUNDARIES TO FIT*/
+            if (place.geometry.viewport){
+              bounds.union(place.geometry.viewport)
+            } else {
+              bounds.extend(place.geometry.location)
+            }
+          }
+          map.fitBounds(bounds)
+        }
+
+        /*FUNCTION: USE PLACE_ID TO EXECUTE PLACE.DETAIL SEARCH*/
+        function getPlacesDetails(marker, infowindow) {
+          let service = new google.maps.places.PlacesService(map)
+          service.getDetails(
+            {
+              placeId: marker.id,
+            }
+          ), function(places, status) { //GOOGLE'S ANONYMOUS HANDLER FUNCTION
+            if(status === google.maps.places.PlacesServiceStatus.OK) {
+              infowindow.marker = marker //set its marker so it won't be created again
+              let innerHTML = '<div>'
+              if (place.name) { //if name property exists
+                innerHTML += '<strong>'  + place.name + '</strong>'//add it
+              }
+              if (place.formatted_address) {
+                innerHTML += '<br>' + place.formatted_address
+              }
+              if (place.formatted_phone_number) {
+                innerHTML += '<br>' + place.formatted_phone_number
+              }
+              if (place.opening_hours) {
+                innerHTML += '<br><br><strong>Hours:</strong><br>' +
+                    place.opening_hours.weekday_text[0] + '<br>' +
+                    place.opening_hours.weekday_text[1] + '<br>' +
+                    place.opening_hours.weekday_text[2] + '<br>' +
+                    place.opening_hours.weekday_text[3] + '<br>' +
+                    place.opening_hours.weekday_text[4] + '<br>' +
+                    place.opening_hours.weekday_text[5] + '<br>' +
+                    place.opening_hours.weekday_text[6]
+              }
+              if (place.photos) {
+                innerHTML += '<br><br><img src="' + place.photos.getUrl(
+                  {
+                    maxHeight: 100,
+                    maxWidth: 200
+                  } +
+                  '"/>'
+                )
+              }
+              innerHTML += '</div>'
+              infowindow.setContent(innerHTML)
+              infowindow.open(map, marker)
+              //Make sure the marker property is cleared if the infowindow closes.
+              infowindow.addListener('closeclick', function() {
+                infowindow.marker(null)
+              })
+            }
+          }
+        }
+
+    </script>
+    <!--TODO: Load the JS API ASYNCHRONOUSLY below.-->
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyC6I8HiVEE3f_unE-O7Euas7E_8f96wePA&v=3&callback=initMap&libraries=drawing,geometry,places">
+    </script>
+</body>
+
 </html>
